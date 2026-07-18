@@ -96,13 +96,13 @@
     <p>ইংরেজিতে টাইপ করে <b>Space</b> চাপুন। কোনো বাংলা শব্দের উপর ক্লিক করলে অন্যান্য অপশন এবং ইংরেজি শব্দ দেখতে পাবেন।</p>
     
     <div class="container">
-        <!-- Textarea এর বদলে div ব্যবহার করা হয়েছে -->
         <div id="editor" class="editor-box" contenteditable="true" spellcheck="false"></div>
-        <ul id="dropdown" class="suggestion-box"></ul>
-        
         <button id="clearBtn" class="btn-clear">Clear Text</button>
         <div class="clearfix"></div>
     </div>
+
+    <!-- dropdown টি এখানে কন্টেইনারের বাইরে বসান -->
+    <ul id="dropdown" class="suggestion-box"></ul>
 
     <script>
         const editor = document.getElementById('editor');
