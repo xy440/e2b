@@ -1,4 +1,4 @@
-# 🇧🇩 e2b: Advanced Bengali Phonetic Editor
+# 🇧🇩 E2B: Advanced Bengali Phonetic Editor
 
 An advanced, browser-based text editor that allows users to type in Bengali phonetically using English characters (e.g., typing "ami" outputs "আমি"). It uses the **Google Input Tools API** for highly accurate transliteration and features an intuitive UI with auto-save and word suggestion capabilities.
 
