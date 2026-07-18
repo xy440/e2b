@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Bengali Phonetic Editor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h2 { color: #333; text-align: center; }
+        p { color: #666; text-align: center; }
+        
+        .container { position: relative; }
+        
+        /* Textarea এর বদলে Content Editable Div */
+        .editor-box {
+            width: 100%;
+            height: 300px;
+            font-size: 20px;
+            padding: 15px;
+            background: #fff;
+            border: 2px solid #007BFF;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            box-sizing: border-box;
+            outline: none;
+            line-height: 1.5;
+        }
+        .editor-box:focus { border-color: #0056b3; }
+        
+        /* ক্লিক করার জন্য স্পেশাল শব্দের স্টাইল */
+        .b-word {
+            cursor: pointer;
+            border-bottom: 1px dashed transparent;
+            transition: 0.2s;
+        }
+        .b-word:hover {
+            border-bottom: 1px dashed #007BFF;
+            color: #007BFF;
+        }
+
+        /* ড্রপ-ডাউন মেনুর স্টাইল */
+        .suggestion-box {
+            position: absolute;
+            background: #fff;
+            border: 1px solid #ccc;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: none; /* ডিফল্টভাবে লুকানো থাকবে */
+            z-index: 1000;
+            min-width: 120px;
+        }
+        .suggestion-box li {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 18px;
+        }
+        .suggestion-box li:last-child { border-bottom: none; }
+        .suggestion-box li:hover { background: #f0f8ff; }
+        .suggestion-box li.eng-opt {
+            color: #d9534f;
+            font-family: monospace;
+            font-size: 16px;
+            background: #fdfdfd;
+        }
+
+        .btn-clear {
+            display: block;
+            margin: 15px 0;
+            padding: 10px 20px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            float: right;
+        }
+        .btn-clear:hover { background-color: #c82333; }
+        .clearfix { clear: both; }
+    </style>
+</head>
+<body>
+
+    <h2>অ্যাডভান্সড বাংলা টাইপিং</h2>
+    <p>ইংরেজিতে টাইপ করে <b>Space</b> চাপুন। কোনো বাংলা শব্দের উপর ক্লিক করলে অন্যান্য অপশন এবং ইংরেজি শব্দ দেখতে পাবেন।</p>
+    
+    <div class="container">
+        <!-- Textarea এর বদলে div ব্যবহার করা হয়েছে -->
+        <div id="editor" class="editor-box" contenteditable="true" spellcheck="false"></div>
+        <ul id="dropdown" class="suggestion-box"></ul>
+        
+        <button id="clearBtn" class="btn-clear">Clear Text</button>
+        <div class="clearfix"></div>
+    </div>
+
+    <script>
+        const editor = document.getElementById('editor');
+        const dropdown = document.getElementById('dropdown');
+        const clearBtn = document.getElementById('clearBtn');
+        let activeWordSpan = null;
+
+        // ১. Auto Load: পেজ লোড হলে আগের সেভ করা ডেটা আনা
+        window.onload = function() {
+            const savedHtml = localStorage.getItem('savedBengaliHtml');
+            if (savedHtml) {
+                editor.innerHTML = savedHtml;
+            }
+        };
+
+        // ২. Auto Save: টেক্সট সেভ করার ফাংশন
+        function saveTextToLocal() {
+            localStorage.setItem('savedBengaliHtml', editor.innerHTML);
+        }
+
+        editor.addEventListener('input', saveTextToLocal);
+
+        // ৩. টাইপ করার পর স্পেস দিলে কনভার্ট হওয়া
+        editor.addEventListener('keyup', async function(e) {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                const selection = window.getSelection();
+                if (!selection.rangeCount) return;
+                
+                const range = selection.getRangeAt(0);
+                const currentNode = range.startContainer;
+                
+                // শুধুমাত্র টেক্সট নোড হলে কাজ করবে
+                if (currentNode.nodeType !== Node.TEXT_NODE) return;
+
+                const text = currentNode.nodeValue;
+                const offset = range.startOffset;
+                const textBeforeCursor = text.slice(0, offset);
+
+                // রেগুলার এক্সপ্রেশন দিয়ে শেষের ইংরেজি শব্দটি ধরা
+                const match = textBeforeCursor.match(/([a-zA-Z]+)(\s*)$/);
+
+                if (match) {
+                    const englishWord = match[1];
+                    const trailingSpace = match[2];
+                    
+                    // Google API (num=5 দেওয়া হয়েছে যাতে ৫টি সাজেশন আসে)
+                    const apiUrl = `https://inputtools.google.com/request?text=${englishWord}&itc=bn-t-i0-und&num=5&cp=0&cs=1&ie=utf-8&oe=utf-8&app=test`;
+                    
+                    try {
+                        const response = await fetch(apiUrl);
+                        const data = await response.json();
+                        
+                        if (data[0] === 'SUCCESS') {
+                            const suggestions = data[1][0][1];
+                            const bestMatch = suggestions[0]; // সবচেয়ে সঠিক শব্দ
+                            
+                            // ক্লিক করার জন্য একটি span ট্যাগ তৈরি করা
+                            const span = document.createElement('span');
+                            span.className = 'b-word';
+                            span.dataset.eng = englishWord; // ইংরেজি শব্দটি লুকিয়ে রাখা
+                            span.dataset.alts = JSON.stringify(suggestions); // বাকি অপশনগুলো লুকিয়ে রাখা
+                            span.textContent = bestMatch;
+                            
+                            // DOM Manipulation: ইংরেজি শব্দটি মুছে স্প্যান বসানো
+                            const wordStart = offset - match[0].length;
+                            const textNodeAfter = currentNode.splitText(wordStart);
+                            const remainingTextNode = textNodeAfter.splitText(match[1].length);
+                            
+                            currentNode.parentNode.replaceChild(span, textNodeAfter);
+                            
+                            // কার্সর ঠিক জায়গায় সেট করা
+                            range.setStart(remainingTextNode, trailingSpace.length);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            
+                            saveTextToLocal(); // সেভ করা
+                        }
+                    } catch (err) {
+                        console.error("Error:", err);
+                    }
+                }
+            }
+        });
+
+        // ৪. শব্দের উপর ক্লিক করলে ড্রপ-ডাউন দেখানো
+        editor.addEventListener('click', function(e) {
+            if (e.target.classList.contains('b-word')) {
+                activeWordSpan = e.target;
+                const englishWord = activeWordSpan.dataset.eng;
+                const alternatives = JSON.parse(activeWordSpan.dataset.alts);
+                
+                dropdown.innerHTML = ''; // আগের মেনু ক্লিয়ার করা
+                
+                // বাংলা সাজেশনগুলো মেনুতে যুক্ত করা
+                alternatives.forEach(alt => {
+                    const li = document.createElement('li');
+                    li.textContent = alt;
+                    li.onclick = () => replaceWord(alt);
+                    dropdown.appendChild(li);
+                });
+                
+                // অরিজিনাল ইংরেজি শব্দটি মেনুর শেষে যুক্ত করা
+                const engLi = document.createElement('li');
+                engLi.textContent = englishWord;
+                engLi.className = 'eng-opt';
+                engLi.title = "Original English Word";
+                engLi.onclick = () => replaceWord(englishWord);
+                dropdown.appendChild(engLi);
+                
+                // ড্রপ-ডাউন পজিশন সেট করা (যেখানে ক্লিক করা হয়েছে তার ঠিক নিচে)
+                const rect = activeWordSpan.getBoundingClientRect();
+                dropdown.style.left = `${rect.left + window.scrollX}px`;
+                dropdown.style.top = `${rect.bottom + window.scrollY + 5}px`;
+                dropdown.style.display = 'block';
+            }
+        });
+
+        // ৫. ড্রপ-ডাউন থেকে কোনো শব্দ সিলেক্ট করলে রিপ্লেস করা
+        function replaceWord(newText) {
+            if (activeWordSpan) {
+                activeWordSpan.textContent = newText;
+                dropdown.style.display = 'none';
+                activeWordSpan = null;
+                saveTextToLocal();
+            }
+        }
+
+        // ৬. অন্য কোথাও ক্লিক করলে ড্রপ-ডাউন লুকিয়ে ফেলা
+        document.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('b-word') && e.target.closest('#dropdown') === null) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // ৭. Clear Button
+        clearBtn.addEventListener('click', function() {
+            if(confirm('আপনি কি সব লেখা মুছে ফেলতে চান?')) {
+                editor.innerHTML = '';
+                localStorage.removeItem('savedBengaliHtml');
+            }
+        });
+    </script>
+
+</body>
+</html>
