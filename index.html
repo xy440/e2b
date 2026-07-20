@@ -3,249 +3,325 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Bengali Phonetic Editor</title>
+    <title>E2B: Advanced Bengali Editor</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-            padding: 40px;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        h2 { color: #333; text-align: center; }
-        p { color: #666; text-align: center; }
-        
+        body { font-family: sans-serif; background-color: #f4f7f6; padding: 20px; max-width: 800px; margin: 0 auto; }
         .container { position: relative; }
+        .editor-box { width: 100%; height: 300px; font-size: 20px; padding: 15px; background: #fff; border: 2px solid #007BFF; border-radius: 8px; outline: none; margin-bottom: 10px; overflow-y: auto; line-height: 1.5; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        button { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
         
-        /* Textarea এর বদলে Content Editable Div */
-        .editor-box {
-            width: 100%;
-            height: 300px;
-            font-size: 20px;
-            padding: 15px;
-            background: #fff;
-            border: 2px solid #007BFF;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            overflow-y: auto;
-            box-sizing: border-box;
-            outline: none;
-            line-height: 1.5;
-        }
-        .editor-box:focus { border-color: #0056b3; }
+        #pasteBtn { background-color: #28a745; }
+        #copyBtn { background-color: #007bff; }
+        #convertBtn { background-color: #fd7e14; }
+        #translateBtn { background-color: #6f42c1; } 
+        #undoBtn { background-color: #17a2b8; } /* Undo বাটনের জন্য সুন্দর টিল (Teal) কালার */
+        #clearBtn { background-color: #dc3545; }
         
-        /* ক্লিক করার জন্য স্পেশাল শব্দের স্টাইল */
-        .b-word {
-            cursor: pointer;
-            border-bottom: 1px dashed transparent;
-            transition: 0.2s;
-        }
-        .b-word:hover {
-            border-bottom: 1px dashed #007BFF;
-            color: #007BFF;
-        }
-
-        /* ড্রপ-ডাউন মেনুর স্টাইল */
-        .suggestion-box {
-            position: absolute;
-            background: #fff;
-            border: 1px solid #ccc;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            border-radius: 5px;
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            display: none; /* ডিফল্টভাবে লুকানো থাকবে */
-            z-index: 1000;
-            min-width: 120px;
-        }
-        .suggestion-box li {
-            padding: 10px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-            font-size: 18px;
-        }
-        .suggestion-box li:last-child { border-bottom: none; }
+        #toast { visibility: hidden; min-width: 200px; background-color: #333; color: #fff; text-align: center; border-radius: 5px; padding: 10px; position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1001; }
+        
+        .b-word { cursor: pointer; transition: color 0.2s; }
+        .b-word:hover { color: #007BFF; }
+        
+        .suggestion-box { position: absolute; background: #fff; border: 1px solid #ccc; box-shadow: 0 5px 15px rgba(0,0,0,0.2); border-radius: 5px; list-style: none; padding: 0; display: none; z-index: 1000; min-width: 150px;}
+        .suggestion-box li { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; }
         .suggestion-box li:hover { background: #f0f8ff; }
-        .suggestion-box li.eng-opt {
-            color: #d9534f;
-            font-family: monospace;
-            font-size: 16px;
-            background: #fdfdfd;
-        }
+        .eng-opt { color: #d9534f; font-family: monospace; }
+        .copy-opt { color: #28a745; font-weight: bold; background: #fdfdfd; }
 
-        .btn-clear {
-            display: block;
-            margin: 15px 0;
-            padding: 10px 20px;
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            float: right;
+        /* Custom Modal / Popup Styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px);
+            display: none; align-items: center; justify-content: center; z-index: 2000;
         }
-        .btn-clear:hover { background-color: #c82333; }
-        .clearfix { clear: both; }
+        .modal-content {
+            background: #fff; padding: 25px; border-radius: 10px; width: 320px; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: popIn 0.3s ease-out;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-content h3 { margin-top: 0; color: #333; margin-bottom: 10px; font-size: 22px; }
+        .modal-content p { color: #666; font-size: 16px; margin-bottom: 25px; line-height: 1.4; }
+        .modal-buttons { display: flex; justify-content: center; gap: 15px; }
+        .btn-confirm { background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
+        .btn-cancel { background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
     </style>
 </head>
 <body>
 
-    <h2>অ্যাডভান্সড বাংলা টাইপিং</h2>
-    <p>ইংরেজিতে টাইপ করে <b>Space</b> চাপুন। কোনো বাংলা শব্দের উপর ক্লিক করলে অন্যান্য অপশন এবং ইংরেজি শব্দ দেখতে পাবেন।</p>
-    
+    <h2>E2B: বাংলা টাইপিং এবং ট্রান্সলেটর</h2>
     <div class="container">
+        <div class="toolbar">
+            <button id="pasteBtn">Paste</button>
+            <button id="copyBtn">Copy All</button>
+            <button id="convertBtn">Convert Banglish</button>
+            <button id="translateBtn">Translate English</button>
+            <button id="undoBtn">Undo</button>
+            <button id="clearBtn">Clear</button>
+        </div>
         <div id="editor" class="editor-box" contenteditable="true" spellcheck="false"></div>
-        <button id="clearBtn" class="btn-clear">Clear Text</button>
-        <div class="clearfix"></div>
     </div>
 
-    <!-- dropdown টি এখানে কন্টেইনারের বাইরে বসান -->
+    <!-- Dropdown and Toast -->
     <ul id="dropdown" class="suggestion-box"></ul>
+    <div id="toast"></div>
+
+    <!-- Custom Clear Confirmation Modal -->
+    <div id="clearModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>মুছে ফেলতে চান?</h3>
+            <p>আপনি কি নিশ্চিত যে আপনি এডিটরের সব লেখা মুছে ফেলতে চান?</p>
+            <div class="modal-buttons">
+                <button id="cancelClear" class="btn-cancel">Cancel</button>
+                <button id="confirmClear" class="btn-confirm">Yes, Clear</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const editor = document.getElementById('editor');
         const dropdown = document.getElementById('dropdown');
-        const clearBtn = document.getElementById('clearBtn');
-        let activeWordSpan = null;
+        const toast = document.getElementById('toast');
+        const clearModal = document.getElementById('clearModal');
 
-        // ১. Auto Load: পেজ লোড হলে আগের সেভ করা ডেটা আনা
-        window.onload = function() {
-            const savedHtml = localStorage.getItem('savedBengaliHtml');
-            if (savedHtml) {
-                editor.innerHTML = savedHtml;
+        // Undo History Setup
+        let undoStack = [];
+        let isUndoing = false;
+
+        function saveUndoState() {
+            if (isUndoing) return;
+            const content = editor.innerHTML;
+            if (undoStack.length === 0 || undoStack[undoStack.length - 1] !== content) {
+                undoStack.push(content);
+                if (undoStack.length > 50) undoStack.shift(); // সর্বোচ্চ ৫০টি কাজের রেকর্ড রাখবে
+            }
+        }
+
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.style.visibility = 'visible';
+            setTimeout(() => toast.style.visibility = 'hidden', 2000);
+        }
+
+        window.onload = () => {
+            editor.innerHTML = localStorage.getItem('savedBengaliHtml') || '';
+            saveUndoState(); // পেজ লোড হওয়ার সাথে সাথে প্রথম স্টেট সেভ করা
+        };
+
+        const save = () => localStorage.setItem('savedBengaliHtml', editor.innerHTML);
+
+        // সাধারণ টাইপিং করার সময় স্টেট সেভ করা (Debounce System)
+        let typingTimer;
+        editor.addEventListener('input', () => {
+            save();
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(saveUndoState, 500); // লেখা থামানোর আধা সেকেন্ড পর সেভ হবে
+        });
+
+        // Undo Button Action
+        document.getElementById('undoBtn').onclick = () => {
+            if (undoStack.length > 1) {
+                isUndoing = true;
+                undoStack.pop(); // বর্তমান স্টেট বাদ দেওয়া
+                const previousContent = undoStack[undoStack.length - 1];
+                editor.innerHTML = previousContent; // আগের স্টেটে ফিরে যাওয়া
+                save();
+                showToast("Undo Successful!");
+                isUndoing = false;
+            } else {
+                showToast("Nothing to undo!");
             }
         };
 
-        // ২. Auto Save: টেক্সট সেভ করার ফাংশন
-        function saveTextToLocal() {
-            localStorage.setItem('savedBengaliHtml', editor.innerHTML);
-        }
+        // Copy Entire Text
+        document.getElementById('copyBtn').onclick = () => {
+            navigator.clipboard.writeText(editor.innerText).then(() => showToast("Entire Text Copied!"));
+        };
 
-        editor.addEventListener('input', saveTextToLocal);
+        // Paste
+        document.getElementById('pasteBtn').onclick = async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.execCommand('insertText', false, text);
+                saveUndoState(); // পেস্ট করার পর স্টেট সেভ
+            } catch (err) {
+                showToast("Please allow clipboard access!");
+            }
+        };
 
-        // ৩. টাইপ করার পর স্পেস দিলে কনভার্ট হওয়া
+        // Convert Banglish
+        document.getElementById('convertBtn').onclick = async () => {
+            let rawText = editor.innerText;
+            const parts = rawText.split(/([a-zA-Z]+)/);
+            let newHtml = "";
+
+            for (let part of parts) {
+                if (/^[a-zA-Z]+$/.test(part)) {
+                    try {
+                        const res = await fetch(`https://inputtools.google.com/request?text=${part}&itc=bn-t-i0-und&num=3&cp=0&cs=1&ie=utf-8&oe=utf-8&app=test`);
+                        const data = await res.json();
+                        if (data[0] === 'SUCCESS') {
+                            newHtml += `<span class="b-word" data-eng="${part}" data-alts='${JSON.stringify(data[1][0][1])}'>${data[1][0][1][0]}</span>`;
+                        } else { 
+                            newHtml += part; 
+                        }
+                    } catch(e) {
+                        newHtml += part;
+                    }
+                } else {
+                    newHtml += part.replace(/\./g, '।').replace(/\n/g, '<br>');
+                }
+            }
+            editor.innerHTML = newHtml;
+            save();
+            saveUndoState(); // কনভার্ট করার পর স্টেট সেভ
+            showToast("Converted to Bangla!");
+        };
+
+        // Translate English
+        document.getElementById('translateBtn').onclick = async () => {
+            const rawText = editor.innerText.trim();
+            if (!rawText) {
+                showToast("Editor is empty!");
+                return;
+            }
+            
+            showToast("Translating... Please wait.");
+            
+            try {
+                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(rawText)}&langpair=en|bn`);
+                const data = await res.json();
+                
+                if (data.responseData && data.responseData.translatedText) {
+                    editor.innerHTML = data.responseData.translatedText;
+                    save();
+                    saveUndoState(); // ট্রান্সলেট করার পর স্টেট সেভ
+                    showToast("Translated Successfully!");
+                } else {
+                    showToast("Error in translation.");
+                }
+            } catch(e) {
+                showToast("Translation Failed!");
+            }
+        };
+
+        // Typing Logic (Banglish to Bangla on space/punctuation)
         editor.addEventListener('keyup', async function(e) {
-            if (e.code === 'Space' || e.code === 'Enter') {
+            const triggerKeys = [' ', 'Enter', '.', ',', '?', '!'];
+            
+            if (triggerKeys.includes(e.key)) {
                 const selection = window.getSelection();
                 if (!selection.rangeCount) return;
                 
                 const range = selection.getRangeAt(0);
                 const currentNode = range.startContainer;
                 
-                // শুধুমাত্র টেক্সট নোড হলে কাজ করবে
                 if (currentNode.nodeType !== Node.TEXT_NODE) return;
 
-                const text = currentNode.nodeValue;
-                const offset = range.startOffset;
-                const textBeforeCursor = text.slice(0, offset);
-
-                // রেগুলার এক্সপ্রেশন দিয়ে শেষের ইংরেজি শব্দটি ধরা
-                const match = textBeforeCursor.match(/([a-zA-Z]+)(\s*)$/);
+                const textBeforeCursor = currentNode.textContent.slice(0, range.startOffset);
+                const match = textBeforeCursor.match(/([a-zA-Z]+)([\s.,?!]*)$/);
 
                 if (match) {
-                    const englishWord = match[1];
-                    const trailingSpace = match[2];
-                    
-                    // Google API (num=5 দেওয়া হয়েছে যাতে ৫টি সাজেশন আসে)
-                    const apiUrl = `https://inputtools.google.com/request?text=${englishWord}&itc=bn-t-i0-und&num=5&cp=0&cs=1&ie=utf-8&oe=utf-8&app=test`;
+                    const engWord = match[1];
+                    let trailingChars = match[2];
                     
                     try {
-                        const response = await fetch(apiUrl);
-                        const data = await response.json();
+                        const res = await fetch(`https://inputtools.google.com/request?text=${engWord}&itc=bn-t-i0-und&num=3&cp=0&cs=1&ie=utf-8&oe=utf-8&app=test`);
+                        const data = await res.json();
                         
                         if (data[0] === 'SUCCESS') {
-                            const suggestions = data[1][0][1];
-                            const bestMatch = suggestions[0]; // সবচেয়ে সঠিক শব্দ
-                            
-                            // ক্লিক করার জন্য একটি span ট্যাগ তৈরি করা
                             const span = document.createElement('span');
                             span.className = 'b-word';
-                            span.dataset.eng = englishWord; // ইংরেজি শব্দটি লুকিয়ে রাখা
-                            span.dataset.alts = JSON.stringify(suggestions); // বাকি অপশনগুলো লুকিয়ে রাখা
-                            span.textContent = bestMatch;
+                            span.dataset.eng = engWord;
+                            span.dataset.alts = JSON.stringify(data[1][0][1]);
+                            span.textContent = data[1][0][1][0];
                             
-                            // DOM Manipulation: ইংরেজি শব্দটি মুছে স্প্যান বসানো
-                            const wordStart = offset - match[0].length;
-                            const textNodeAfter = currentNode.splitText(wordStart);
-                            const remainingTextNode = textNodeAfter.splitText(match[1].length);
+                            const start = range.startOffset - match[0].length;
+                            const textNodeAfter = currentNode.splitText(start);
+                            const remainingTextNode = textNodeAfter.splitText(match[0].length);
                             
                             currentNode.parentNode.replaceChild(span, textNodeAfter);
                             
-                            // কার্সর ঠিক জায়গায় সেট করা
-                            range.setStart(remainingTextNode, trailingSpace.length);
+                            trailingChars = trailingChars.replace(/\./g, '।');
+                            
+                            const separatorNode = document.createTextNode(trailingChars);
+                            span.parentNode.insertBefore(separatorNode, span.nextSibling);
+                            
+                            range.setStart(separatorNode, trailingChars.length);
                             range.collapse(true);
                             selection.removeAllRanges();
                             selection.addRange(range);
                             
-                            saveTextToLocal(); // সেভ করা
+                            save();
+                            saveUndoState(); // অটো-কনভার্ট হওয়ার পর স্টেট সেভ
                         }
-                    } catch (err) {
-                        console.error("Error:", err);
+                    } catch(err) {
+                        console.error(err);
                     }
                 }
             }
         });
 
-        // ৪. শব্দের উপর ক্লিক করলে ড্রপ-ডাউন দেখানো
-        editor.addEventListener('click', function(e) {
+        // Dropdown Click
+        editor.addEventListener('click', (e) => {
             if (e.target.classList.contains('b-word')) {
-                activeWordSpan = e.target;
-                const englishWord = activeWordSpan.dataset.eng;
-                const alternatives = JSON.parse(activeWordSpan.dataset.alts);
+                const alts = JSON.parse(e.target.dataset.alts);
+                const currentWord = e.target.textContent;
                 
-                dropdown.innerHTML = ''; // আগের মেনু ক্লিয়ার করা
+                let listHtml = alts.map(a => `<li onclick="replaceWord('${a}')">${a}</li>`).join('');
+                listHtml += `<li class="eng-opt" onclick="replaceWord('${e.target.dataset.eng}')">${e.target.dataset.eng}</li>`;
+                listHtml += `<li class="copy-opt" onclick="copySingleWord('${currentWord}')">📋 Copy</li>`;
                 
-                // বাংলা সাজেশনগুলো মেনুতে যুক্ত করা
-                alternatives.forEach(alt => {
-                    const li = document.createElement('li');
-                    li.textContent = alt;
-                    li.onclick = () => replaceWord(alt);
-                    dropdown.appendChild(li);
-                });
+                dropdown.innerHTML = listHtml;
                 
-                // অরিজিনাল ইংরেজি শব্দটি মেনুর শেষে যুক্ত করা
-                const engLi = document.createElement('li');
-                engLi.textContent = englishWord;
-                engLi.className = 'eng-opt';
-                engLi.title = "Original English Word";
-                engLi.onclick = () => replaceWord(englishWord);
-                dropdown.appendChild(engLi);
-                
-                // ড্রপ-ডাউন পজিশন সেট করা (যেখানে ক্লিক করা হয়েছে তার ঠিক নিচে)
-                const rect = activeWordSpan.getBoundingClientRect();
+                const rect = e.target.getBoundingClientRect();
                 dropdown.style.left = `${rect.left + window.scrollX}px`;
                 dropdown.style.top = `${rect.bottom + window.scrollY + 5}px`;
                 dropdown.style.display = 'block';
+                window.activeWord = e.target;
             }
         });
 
-        // ৫. ড্রপ-ডাউন থেকে কোনো শব্দ সিলেক্ট করলে রিপ্লেস করা
-        function replaceWord(newText) {
-            if (activeWordSpan) {
-                activeWordSpan.textContent = newText;
+        window.replaceWord = function(text) {
+            window.activeWord.textContent = text;
+            dropdown.style.display = 'none';
+            save();
+            saveUndoState(); // শব্দ পরিবর্তন করার পর স্টেট সেভ
+        };
+
+        window.copySingleWord = function(wordToCopy) {
+            navigator.clipboard.writeText(wordToCopy).then(() => {
                 dropdown.style.display = 'none';
-                activeWordSpan = null;
-                saveTextToLocal();
-            }
-        }
+                showToast(`"${wordToCopy}" Copied!`);
+            });
+        };
 
-        // ৬. অন্য কোথাও ক্লিক করলে ড্রপ-ডাউন লুকিয়ে ফেলা
-        document.addEventListener('click', function(e) {
-            if (!e.target.classList.contains('b-word') && e.target.closest('#dropdown') === null) {
-                dropdown.style.display = 'none';
+        document.addEventListener('click', (e) => { 
+            if (!e.target.classList.contains('b-word')) {
+                dropdown.style.display = 'none'; 
             }
         });
 
-        // ৭. Clear Button
-        clearBtn.addEventListener('click', function() {
-            if(confirm('আপনি কি সব লেখা মুছে ফেলতে চান?')) {
-                editor.innerHTML = '';
-                localStorage.removeItem('savedBengaliHtml');
-            }
-        });
+        // Custom Clear Popup Logic
+        document.getElementById('clearBtn').onclick = () => {
+            clearModal.style.display = 'flex';
+        };
+
+        document.getElementById('cancelClear').onclick = () => {
+            clearModal.style.display = 'none';
+        };
+
+        document.getElementById('confirmClear').onclick = () => {
+            editor.innerHTML = ''; 
+            localStorage.removeItem('savedBengaliHtml');
+            saveUndoState(); // ক্লিয়ার করার পরেও স্টেট সেভ (যাতে ভুলে ক্লিয়ার হলে Undo করা যায়!)
+            clearModal.style.display = 'none';
+            showToast("Editor Cleared!");
+        };
     </script>
-
 </body>
 </html>
