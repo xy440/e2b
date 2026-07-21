@@ -16,7 +16,7 @@
         #copyBtn { background-color: #007bff; }
         #convertBtn { background-color: #fd7e14; }
         #translateBtn { background-color: #6f42c1; } 
-        #undoBtn { background-color: #17a2b8; } /* Undo বাটনের জন্য সুন্দর টিল (Teal) কালার */
+        #undoBtn { background-color: #17a2b8; }
         #clearBtn { background-color: #dc3545; }
         
         #toast { visibility: hidden; min-width: 200px; background-color: #333; color: #fff; text-align: center; border-radius: 5px; padding: 10px; position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1001; }
@@ -49,6 +49,23 @@
         .modal-buttons { display: flex; justify-content: center; gap: 15px; }
         .btn-confirm { background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
         .btn-cancel { background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
+
+        /* Footer Style */
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            color: #666;
+            font-size: 14px;
+        }
+        footer a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -68,7 +85,7 @@
 
     <!-- Footer -->
     <footer>
-        &copy; <a href="https://theme-x.org" target="_blank">theme-x.org</a>. All rights reserved.
+        &copy; 2026 <a href="https://theme-x.org" target="_blank">theme-x.org</a>. All rights reserved.
     </footer>
 
     <!-- Dropdown and Toast -->
@@ -93,16 +110,21 @@
         const toast = document.getElementById('toast');
         const clearModal = document.getElementById('clearModal');
 
-        // Undo History Setup
         let undoStack = [];
         let isUndoing = false;
+
+        // ইংরেজি সংখ্যাকে বাংলা সংখ্যায় রূপান্তর করার ফাংশন
+        function convertNumbersToBangla(str) {
+            const numbers = {'0':'০', '1':'১', '2':'২', '3':'৩', '4':'৪', '5':'৫', '6':'৬', '7':'৭', '8':'৮', '9':'৯'};
+            return str.replace(/[0-9]/g, match => numbers[match]);
+        }
 
         function saveUndoState() {
             if (isUndoing) return;
             const content = editor.innerHTML;
             if (undoStack.length === 0 || undoStack[undoStack.length - 1] !== content) {
                 undoStack.push(content);
-                if (undoStack.length > 50) undoStack.shift(); // সর্বোচ্চ ৫০টি কাজের রেকর্ড রাখবে
+                if (undoStack.length > 50) undoStack.shift();
             }
         }
 
@@ -114,26 +136,25 @@
 
         window.onload = () => {
             editor.innerHTML = localStorage.getItem('savedBengaliHtml') || '';
-            saveUndoState(); // পেজ লোড হওয়ার সাথে সাথে প্রথম স্টেট সেভ করা
+            saveUndoState();
         };
 
         const save = () => localStorage.setItem('savedBengaliHtml', editor.innerHTML);
 
-        // সাধারণ টাইপিং করার সময় স্টেট সেভ করা (Debounce System)
         let typingTimer;
         editor.addEventListener('input', () => {
             save();
             clearTimeout(typingTimer);
-            typingTimer = setTimeout(saveUndoState, 500); // লেখা থামানোর আধা সেকেন্ড পর সেভ হবে
+            typingTimer = setTimeout(saveUndoState, 500);
         });
 
         // Undo Button Action
         document.getElementById('undoBtn').onclick = () => {
             if (undoStack.length > 1) {
                 isUndoing = true;
-                undoStack.pop(); // বর্তমান স্টেট বাদ দেওয়া
+                undoStack.pop();
                 const previousContent = undoStack[undoStack.length - 1];
-                editor.innerHTML = previousContent; // আগের স্টেটে ফিরে যাওয়া
+                editor.innerHTML = previousContent;
                 save();
                 showToast("Undo Successful!");
                 isUndoing = false;
@@ -152,30 +173,37 @@
             try {
                 const text = await navigator.clipboard.readText();
                 document.execCommand('insertText', false, text);
-                saveUndoState(); // পেস্ট করার পর স্টেট সেভ
+                saveUndoState();
             } catch (err) {
                 showToast("Please allow clipboard access!");
             }
         };
 
-        // Convert Banglish
+        // Convert Banglish (Updated to handle letters and numbers)
         document.getElementById('convertBtn').onclick = async () => {
             let rawText = editor.innerText;
-            const parts = rawText.split(/([a-zA-Z]+)/);
+            // ইংরেজি অক্ষর এবং সংখ্যাগুলো ধরার জন্য আপডেট করা এক্সপ্রেশন
+            const parts = rawText.split(/([a-zA-Z0-9]+)/);
             let newHtml = "";
 
             for (let part of parts) {
-                if (/^[a-zA-Z]+$/.test(part)) {
-                    try {
-                        const res = await fetch(`https://inputtools.google.com/request?text=${part}&itc=bn-t-i0-und&num=3&cp=0&cs=1&ie=utf-8&oe=utf-8&app=test`);
-                        const data = await res.json();
-                        if (data[0] === 'SUCCESS') {
-                            newHtml += `<span class="b-word" data-eng="${part}" data-alts='${JSON.stringify(data[1][0][1])}'>${data[1][0][1][0]}</span>`;
-                        } else { 
-                            newHtml += part; 
+                if (/^[a-zA-Z0-9]+$/.test(part)) {
+                    // যদি পুরোটাই সংখ্যা হয়, তবে সরাসরি বাংলা সংখ্যায় কনভার্ট হবে
+                    if (/^[0-9]+$/.test(part)) {
+                        newHtml += convertNumbersToBangla(part);
+                    } else {
+                        // ইংরেজি বর্ণমালা থাকলে গুগল ইনপুট টুলস API কল হবে
+                        try {
+                            const res = await fetch(`https://inputtools.google.com/request?text=${part}&itc=bn-t-i0-und&num=3&cp=0&cs=1&ie=utf-8&oe=utf-8&app=test`);
+                            const data = await res.json();
+                            if (data[0] === 'SUCCESS') {
+                                newHtml += `<span class="b-word" data-eng="${part}" data-alts='${JSON.stringify(data[1][0][1])}'>${data[1][0][1][0]}</span>`;
+                            } else { 
+                                newHtml += part; 
+                            }
+                        } catch(e) {
+                            newHtml += part;
                         }
-                    } catch(e) {
-                        newHtml += part;
                     }
                 } else {
                     newHtml += part.replace(/\./g, '।').replace(/\n/g, '<br>');
@@ -183,7 +211,7 @@
             }
             editor.innerHTML = newHtml;
             save();
-            saveUndoState(); // কনভার্ট করার পর স্টেট সেভ
+            saveUndoState();
             showToast("Converted to Bangla!");
         };
 
@@ -204,7 +232,7 @@
                 if (data.responseData && data.responseData.translatedText) {
                     editor.innerHTML = data.responseData.translatedText;
                     save();
-                    saveUndoState(); // ট্রান্সলেট করার পর স্টেট সেভ
+                    saveUndoState();
                     showToast("Translated Successfully!");
                 } else {
                     showToast("Error in translation.");
@@ -214,7 +242,7 @@
             }
         };
 
-        // Typing Logic (Banglish to Bangla on space/punctuation)
+        // Typing Logic (Updated to support numbers like 1, 2, 3...)
         editor.addEventListener('keyup', async function(e) {
             const triggerKeys = [' ', 'Enter', '.', ',', '?', '!'];
             
@@ -228,24 +256,50 @@
                 if (currentNode.nodeType !== Node.TEXT_NODE) return;
 
                 const textBeforeCursor = currentNode.textContent.slice(0, range.startOffset);
-                const match = textBeforeCursor.match(/([a-zA-Z]+)([\s.,?!]*)$/);
+                // এখন এটি অক্ষর এবং সংখ্যা দুটোই ধরতে পারবে (যেমন: word123 বা শুধু 123)
+                const match = textBeforeCursor.match(/([a-zA-Z0-9]+)([\s.,?!]*)$/);
 
                 if (match) {
-                    const engWord = match[1];
+                    const typedWord = match[1];
                     let trailingChars = match[2];
                     
+                    // যদি শুধু সংখ্যা হয়, তবে সরাসরি বাংলা সংখ্যা বসিয়ে দিবে
+                    if (/^[0-9]+$/.test(typedWord)) {
+                        const banglaNum = convertNumbersToBangla(typedWord);
+                        const start = range.startOffset - match[0].length;
+                        const textNodeAfter = currentNode.splitText(start);
+                        textNodeAfter.splitText(match[0].length);
+                        
+                        const numNode = document.createTextNode(banglaNum + (trailingChars.replace(/\./g, '।')));
+                        currentNode.parentNode.replaceChild(numNode, textNodeAfter);
+                        
+                        range.setStart(numNode, numNode.textContent.length);
+                        range.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        
+                        save();
+                        saveUndoState();
+                        return;
+                    }
+
+                    // বর্ণমালাযুক্ত শব্দের জন্য আগের মতো API কল হবে
                     try {
-                        const res = await fetch(`https://inputtools.google.com/request?text=${engWord}&itc=bn-t-i0-und&num=3&cp=0&cs=1&ie=utf-8&oe=utf-8&app=test`);
+                        const res = await fetch(`https://inputtools.google.com/request?text=${typedWord}&itc=bn-t-i0-und&num=3&cp=0&cs=1&ie=utf-8&oe=utf-8&app=test`);
                         const data = await res.json();
                         
                         if (data[0] === 'SUCCESS') {
+                            if (!currentNode.parentNode) return;
+
                             const span = document.createElement('span');
                             span.className = 'b-word';
-                            span.dataset.eng = engWord;
+                            span.dataset.eng = typedWord;
                             span.dataset.alts = JSON.stringify(data[1][0][1]);
                             span.textContent = data[1][0][1][0];
                             
                             const start = range.startOffset - match[0].length;
+                            if (start < 0 || start > currentNode.textContent.length) return;
+
                             const textNodeAfter = currentNode.splitText(start);
                             const remainingTextNode = textNodeAfter.splitText(match[0].length);
                             
@@ -255,14 +309,14 @@
                             
                             const separatorNode = document.createTextNode(trailingChars);
                             span.parentNode.insertBefore(separatorNode, span.nextSibling);
-                            
+
                             range.setStart(separatorNode, trailingChars.length);
                             range.collapse(true);
                             selection.removeAllRanges();
                             selection.addRange(range);
                             
                             save();
-                            saveUndoState(); // অটো-কনভার্ট হওয়ার পর স্টেট সেভ
+                            saveUndoState();
                         }
                     } catch(err) {
                         console.error(err);
@@ -279,7 +333,7 @@
                 
                 let listHtml = alts.map(a => `<li onclick="replaceWord('${a}')">${a}</li>`).join('');
                 listHtml += `<li class="eng-opt" onclick="replaceWord('${e.target.dataset.eng}')">${e.target.dataset.eng}</li>`;
-                listHtml += `<li class="copy-opt" onclick="copySingleWord('${currentWord}')">📋 Copy</li>`;
+                listHtml += `<li class="copy-opt" onclick="copySingleWord('${currentWord}')">📋 Copy this word</li>`;
                 
                 dropdown.innerHTML = listHtml;
                 
@@ -295,7 +349,7 @@
             window.activeWord.textContent = text;
             dropdown.style.display = 'none';
             save();
-            saveUndoState(); // শব্দ পরিবর্তন করার পর স্টেট সেভ
+            saveUndoState();
         };
 
         window.copySingleWord = function(wordToCopy) {
@@ -323,7 +377,7 @@
         document.getElementById('confirmClear').onclick = () => {
             editor.innerHTML = ''; 
             localStorage.removeItem('savedBengaliHtml');
-            saveUndoState(); // ক্লিয়ার করার পরেও স্টেট সেভ (যাতে ভুলে ক্লিয়ার হলে Undo করা যায়!)
+            saveUndoState();
             clearModal.style.display = 'none';
             showToast("Editor Cleared!");
         };
